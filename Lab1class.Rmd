@@ -1,0 +1,162 @@
+---
+title: "Lab 1 Class1"
+author: "SFS_Francis"
+date: "2024-08-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+## Lets load packages
+
+```{r}
+library(haven) 
+library(readr) 
+library(openxlsx)
+library(dplyr)
+library(tidyverse)
+
+```
+
+###Lab: Class One Survey Analysis #INSTRUCTIONS Complete all tasks 1-7 using reproducible coding practices (annotation of all code). Use R syntax to solve all problems (i.e. do not manually change values/variables in datasets or check them manually to make sure things are correct except as a double or triple check). Please cut and paste each problem before each R markdown chunk and annotate your code within the chunks. Compare and consolidate your answers. Select one member of your group to walk the class through how each problem was solved. Elect one member of your group to turn in your consolidated code with answers.
+
+## 1. Import class one survey data from our Github site (<https://github.com/kijohnson/ADA-2024>) (The dataset is called ‘Class 1 Survey Fall 2024_di.csv’), calling the R dataframe that you create Class_1_Survey.
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+Class_1_Survey <- read_csv("C:/Users/Ssemujju Francis/Box/Franx Doxs/MPH Program/Yr 2 Semester 1/Advanced Data Analysis/Lab work/Class 1 Survey Fall 2024_di.csv")
+
+```
+
+## 2. Determine: a. the number of observations (i.e. the number of people who filled out the survey) and b. the number of variables in the dataframe.
+
+```{r}
+dim(Class_1_Survey)
+```
+
+## 3. a. Rename the column variables to something shorter and that is descriptive of what the variable is about (for example like_dogs for the ‘Do you like dogs?’ question variable) and b. Display that they are renamed.
+
+```{r}
+#use names function to rename the 27 variables in order
+names(Class_1_Survey)[1:27]<-c("id", "like_cats", "like_dogs", "have_desert", "slogan",
+"fav_day", "larkORowl", "fav_food", "fav_drink", "fav_season", "fav_month", "hobby",
+"program", "specialization", "stat_software", "R_exp", "coding_comfort", "coding_length",
+"top_three","public_health_interest", "fav_num", "bday", "bmonth", "country", "state",
+"city", "highest_educ_level")
+
+# create list of renamed variables in the object varlist
+colnames(Class_1_Survey)
+
+```
+
+## 4. Write code to determine and display the number of factor, integer, numerical, and character variables there are in the Class_1_Survey dataset.
+
+```{r}
+# Summarize the count of each type of variable
+variable_summary <- Class_1_Survey %>%
+  summarise(
+    num_factor = sum(sapply(., is.factor)),
+    num_integer = sum(sapply(., is.integer)),
+    num_numeric = sum(sapply(., is.numeric)),
+    num_character = sum(sapply(., is.character))
+  )
+
+# Display the result
+print(variable_summary)
+
+```
+
+## 5. a. Using code, check the bday and bmonth variables for any unusual or missing values. If you find any, 
+
+
+```{r}
+# Look at values for bday and bmonth
+Class_1_Survey$bday
+Class_1_Survey$bday
+
+```
+
+
+## 5. b. describe what you will do with the unusual values in a comment before or immediately following the code that does it, and 
+
+```{r}
+## What I will do,
+## - replace the wrongly entered figures that are obvious such as march 31st with "3" which stands for the month 3rd month.
+## - Eliminate the zero "0" since there is no birthday that can have zero value.
+
+
+# Lets clean data, replacing the values that are entered wrongly or unusual values that are obvious.
+
+Class_1_Survey$bday <- gsub("March 31st","3",Class_1_Survey$bday)
+Class_1_Survey$bday <- gsub("May 21-report 21","5",Class_1_Survey$bday)
+Class_1_Survey$bmonth <- gsub("March","3",Class_1_Survey$bmonth)
+Class_1_Survey$bmonth <- gsub("September","9",Class_1_Survey$bmonth)
+Class_1_Survey$bmonth <- gsub("February","2",Class_1_Survey$bmonth)
+Class_1_Survey$bmonth <- gsub("May 21-report 5","5",Class_1_Survey$bmonth)
+Class_1_Survey$bmonth <- gsub("July","7",Class_1_Survey$bmonth)
+
+```
+
+```{r}
+# convert to numeric for statistics
+Class_1_Survey$bmonth<-as.numeric(Class_1_Survey$bmonth)
+Class_1_Survey$bmonth # check values 
+```
+
+
+## 5. c. after you have cleaned up any unusual values, find the median bday and month. \*Note: please make sure that your bday and month variables are numeric before doing statistics
+
+```{r}
+#Lets check for the data type for bday and bmonth
+median(Class_1_Survey$bday, na.rm=TRUE) # 14 (biased because of 0, which is not a value) How could we better design a survey to ensure this doesn't happen?
+median(Class_1_Survey$bmonth, na.rm=TRUE) # 7
+
+
+```
+
+
+
+
+## 6. a. Create a new variable called bseason that gives the season according to Northern Meteorological season in which respondents were born (winter = 12/1 to 2/29, spring = 3/1 to 5/31, summer = 6/1 to 8/31, fall = 9/1 to 11/30). b. Using the table function, print a table of Seasons in the columns and bmonths in the rows that allows you to check that the coding is correct c. Sum the columns using the addmargins function to answer the question of how many classmates were born in each season? Include your answer in the code.
+
+```{r}
+# a.
+# using dplyr
+Class_1_Survey <- Class_1_Survey %>%
+  mutate(bseason=case_when(bmonth %in% c(12,1,2) ~"Winter",
+                           bmonth %in% c(3,4,5) ~"Spring",
+                           bmonth %in% c(6,7,8) ~"Summer",
+                           bmonth %in% c(9,10,11) ~"Fall"))
+table(Class_1_Survey$bmonth, Class_1_Survey$bseason) # check variable
+
+Class_1_Survey$bseason_f<-factor(Class_1_Survey$bseason, levels=c("Winter", "Spring", "Summer", "Fall"))
+
+
+# b. 
+table(Class_1_Survey$bmonth, Class_1_Survey$bseason)
+table(Class_1_Survey$bmonth, Class_1_Survey$bseason_f)
+
+# c.
+tab<-addmargins(table(Class_1_Survey$bmonth, Class_1_Survey$bseason, useNA = "always"), 1)
+tab
+tab<-addmargins(table(Class_1_Survey$bmonth, Class_1_Survey$bseason_f, useNA = "always"), 1)
+tab
+
+# Births by season: Fall = 4 Winter = 9 Spring = 8 Summer = 8
+```
+
+
+
+
+## 7. Pick your favorite variable or variables to analyze, come up with a question you want to answer with that variable or variables, generate the code, and provide an answer to your question. Describe what you did using comments (i.e. #’s).
+
+\`\`\`{r}
+
+\`

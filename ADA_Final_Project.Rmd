@@ -1,0 +1,431 @@
+---
+title: "ADA Final Project"
+author: "S.Francis S."
+date: "2024-10-24"
+output:
+  pdf_document: default
+  word_document:
+    reference_docx: "custom-reference.docx"
+  html_document:
+    df_print: paged
+always_allow_html: true
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+# TITLE. The association between receiving money or gifts from a sexual partner and condom usage among teenagers in Kenya, 2003 – 2005.
+
+## Install packages and open libraries
+```{r cars}
+pacman::p_load(tidyverse, readr, haven, table1, DiagrammeR, rsvg, dagitty, ggdag, Hmisc, DiagrammeRsvg, odds.n.ends, blorr, lmtest, car, broom, jtools)
+
+```
+
+```{r}
+setwd("C:/Users/Ssemujju Francis/Box/Franx Doxs/MPH Program/Yr 2 Semester 1/Advanced Data Analysis/Final Project")
+
+```
+
+```{r}
+### Load dataset
+sur_data <- read_dta("HIKAP_survey.dta")
+
+# View the first few rows of the data
+head(sur_data)
+```
+
+```{r}
+summary(sur_data)
+```
+
+# Data management for variables to be used in this analysis
+```{r}
+# look at column names
+colnames(sur_data)
+```
+
+# Select variables of interest
+```{r}
+sur_data <- sur_data %>%
+  select(
+    condomlast,       # Dependent variable
+    giftpartner,      # Independent variable
+    regpartner,       # Effect modifier
+    age,              # Adjustment variable: age
+    sex,              # Adjustment variable: gender
+    realdivision,     # Adjustment variable: geographical division
+    boysonlyschool,   # Adjustment variable: boys-only school
+    girlsonlyschool   # Adjustment variable: girls-only school
+  )
+
+# Check column names
+colnames(sur_data)
+
+```
+
+
+# conduct some data management
+```{r}
+# Conduct data management for the HIKAP dataset
+sur_data <- sur_data %>%
+  # Recode variables
+  mutate(
+    giftpartner_f = factor(
+      giftpartner,
+      levels = c(1, 2),
+      labels = c("Yes", "No")
+    ),
+    condomlast_f = factor(
+      condomlast,
+      levels = c(1, 2),
+      labels = c("Yes", "No")
+    ),
+    regpartner_f = factor(
+      regpartner,
+      levels = c(1, 2),
+      labels = c("Has Partner", "No Partner")
+    ),
+    # Convert sex variable to factor with meaningful labels
+    sex_f = factor(
+      sex,
+      levels = c("M", "F"),
+      labels = c("Male", "Female")
+    ),
+    # Ensure age is numeric
+    age = as.numeric(age)
+  )
+
+# Verify recoded variables
+table(sur_data$giftpartner, sur_data$giftpartner_f, useNA = "always")
+table(sur_data$condomlast, sur_data$condomlast_f, useNA = "always")
+table(sur_data$regpartner, sur_data$regpartner_f, useNA = "always")
+table(sur_data$sex, sur_data$sex_f, useNA = "always")
+
+
+```
+# Figure 1 
+## Let's make a figure 1 that shows exclusions to arrive at your analytic dataset
+## First we will make the following exclusions one at a time
+- Exclusion 1: Remove records with missing data or "Unknown" values for the independent variable (giftpartner).
+```{r}
+# Exclusion 1: Remove records with missing or "Unknown(N/A)" values for giftpartner_f
+sur_data1 <- sur_data %>%
+  filter(!is.na(giftpartner_f), giftpartner_f != "N/A")
+
+# Count the excluded records
+ex1 <- nrow(sur_data) - nrow(sur_data1)
+ex1
+
+```
+
+- Exclusion 2: Remove records with missing or "Unknown (N/A)" values for the dependent variable (condomlast).
+```{r}
+# Exclusion 2: Remove records with missing or "Unknown/N/A" values for condomlast_f
+sur_data2 <- sur_data1 %>%
+  filter(!is.na(condomlast_f), condomlast_f != "N/A")
+
+# Count the number of exclusions
+ex2 <- nrow(sur_data1) - nrow(sur_data2)
+ex2
+
+```
+
+- Exclusion 3: Remove records with missing data on key covariates.
+Include age, sex_f, realdivision, and regpartner_f:
+```{r}
+
+
+sur_data3 <- sur_data2 %>%
+  drop_na(age, sex_f, regpartner_f, realdivision, boysonlyschool, girlsonlyschool)
+
+ex3 <- nrow(sur_data2) - nrow(sur_data3)
+ex3
+
+```
+
+# Exclusion 4: Handle outliers, duplicates, and invalid data
+```{r}
+# Exclusion 4: Handle outliers, duplicates, and invalid data
+sur_data4 <- sur_data3 %>%
+  # Exclude unrealistic ages
+  filter(age >= 13 & age <= 19) %>%
+  # Exclude invalid school type values
+  filter(boysonlyschool %in% c(0, 1), girlsonlyschool %in% c(0, 1)) %>%
+  # Remove duplicates
+  distinct() %>%
+  # Exclude inconsistent school type records
+  filter(!(boysonlyschool == 1 & girlsonlyschool == 1))
+
+# Calculate the number of exclusions for Exclusion 4
+ex4 <- nrow(sur_data3) - nrow(sur_data4)
+ex4
+
+```
+
+# Create the Flowchart With branching 
+```{r}
+# Generate the flowchart
+grViz("digraph flowchart {
+     
+      node [fontname = Helvetica, shape = rectangle, fontsize=15] 
+      
+      # Define the nodes
+      node1 [label = '@@1']
+      node2 [label = '@@2']
+      node3 [label = '@@3']
+      node4 [label = '@@4']
+      node5 [label = '@@5']
+      
+      # Define the edges
+      node1 -> node2 -> node3 
+      node3 -> node4 # branching
+      node3 -> node5 # branching
+}
+      # Define the labels for each node
+      [1]: 'Original records received for HIKAP survey n = 9,951'
+      [2]: 'Excluding 6,417 records with missing or Unknown values \\n on giftpartner n = 3,534'
+      [3]: 'Excluding 880 records with missing data \\n on condom usage n = 2,654'
+      [4]: 'Excluding 126 records with missing \\n key covariates (age, sex, etc.) n = 2,528'
+      [5]: 'Excluding 1,746 records with missing data \\n on school types n = 782'
+      ")
+
+```
+
+
+# Wrapping text in second box with \\n
+```{r}
+# Note I attach to an object called figure 1 for exporting below
+figure1 <- grViz("digraph flowchart {
+     
+      node [fontname = Helvetica, shape = rectangle, fontsize=15] 
+      
+      # Define nodes
+      node1 [label = '@@1']
+      node2 [label = '@@2']
+      node3 [label = '@@3']
+      node4 [label = '@@4']
+      node5 [label = '@@5']
+      
+      # Define edges
+      node1 -> node2 -> node3 
+      node3 -> node4 # branching
+      node3 -> node5 # branching
+}
+      # Node text with line breaks
+      [1]: 'Original records n = 9,951'
+      [2]: 'Excluding 6,417 records with \\n missing data and N/A on giftpartner n = 3,534'
+      [3]: 'Excluding 880 records with \\n missing data on condom usage n = 2654'
+      [4]: 'Excluding 126 records with \\n missing data on key covariates \\n (age, sex, division, regpartner) n = 2,528'
+      [5]: 'Excluding 1,746 records with \\n missing data on survival variables n = 782'
+      ")
+figure1
+
+```
+
+
+
+
+# export figure
+```{r}
+figure1 %>%
+
+DiagrammeRsvg::export_svg() %>% 
+  charToRaw() %>% 
+  rsvg::rsvg_pdf("Figure_1_HIKAP.pdf")
+```
+
+# Creating a Table 1 using the table1 function. 
+
+# Adding labels to the variables because the raw variables are not publication-quality. This is important in producing a high-quality table.
+```{r}
+label(sur_data4$age) <- "Age (years)" # Age of respondent
+label(sur_data4$sex_f) <- "Gender (Male/Female)" # Gender recoded as Male/Female
+label(sur_data4$giftpartner_f) <- "Received Gifts or Money from Partner" # Independent variable
+label(sur_data4$condomlast_f) <- "Used Condom During Last Sexual Encounter" # Dependent variable
+label(sur_data4$regpartner_f) <- "Has Regular Partner" # Effect modifier
+label(sur_data4$boysonlyschool) <- "Attends Boy's Only School" # School type variable
+label(sur_data4$girlsonlyschool) <- "Attends Girl's Only School" # School type variable
+
+# Generate Table 1 stratified by condomlast_f with adjusted labels and summary
+table1(~ age + sex_f + giftpartner_f + regpartner_f + boysonlyschool + girlsonlyschool + realdivision| condomlast_f, 
+       data = sur_data4, 
+       overall = "Total", # Add overall summary for all respondents
+       rowlabelhead = "Variable", # Header label for row names
+       footnote = "SD = standard deviation. Data stratified by whether the respondent received gifts/money from a partner.")
+
+```
+
+
+
+
+```{r}
+# Load necessary libraries
+library(flextable)
+library(officer)
+
+# Convert Table 1 to a flextable object
+table1_flex <- as_flextable(table1(~ age + sex_f + giftpartner_f + regpartner_f + boysonlyschool + girlsonlyschool | condomlast_f, 
+                                   data = sur_data4, 
+                                   overall = "Total", 
+                                   rowlabelhead = "Variable", 
+                                   footnote = "SD = standard deviation. Data stratified by condom usage."))
+
+# Create a Word document
+doc <- read_docx()
+
+# Add the table to the document
+doc <- body_add_flextable(doc, value = table1_flex)
+
+# Save the Word document to your drive
+print(doc, target = "Table1_CondomUsage.docx")
+
+```
+
+
+# Brief interpritation
+Age: Respondents who reported using a condom during their last sexual encounter were slightly older on average (16.4 years, SD = 1.38) than those who did not (16.2 years, SD = 1.48). The median age was the same across both groups (16 years). This indicates that there is little difference in age distribution between the two groups.
+Gender: A similar proportion of males reported using condoms (64.3%) compared to those who did not (64.6%). Similarly, the percentage of females was comparable between condom users (35.7%) and non-users (35.4%). This suggests that gender distribution is nearly identical between the groups and may not be a strong determinant of condom usage.
+
+Received Gifts or Money from Partner: A slightly higher percentage of respondents who received gifts or money from a partner reported using condoms (51.4%) compared to those who did not use condoms (49.5%). Conversely, a slightly lower percentage of respondents who did not receive gifts/money used condoms (48.6%) compared to those who did not use condoms (50.5%). This suggests a weak association between receiving gifts/money and condom usage.
+
+Has Regular Partner: Respondents with a regular partner were more likely to use condoms (46.1%) compared to those who did not have a regular partner (39.2%). Conversely, respondents without a regular partner were more likely not to use condoms (60.8%) compared to those who used condoms (53.9%). This indicates that having a regular partner might slightly influence condom usage.
+
+Attends Boy's Only School: Respondents who used condoms had a slightly lower mean attendance at boys-only schools (0.236) compared to non-users (0.246). However, the median attendance was 0 for both groups, indicating that most respondents did not attend boys-only schools. This variable appears to have limited variability and influence on condom usage.
+
+Attends Girl's Only School: Similarly, attendance at girls-only schools was comparable between the groups, with a mean of 0.0927 for condom users and 0.0892 for non-users. The median attendance was 0 for both groups, showing that this variable also has limited variability and impact on condom usage.
+
+# General Observations:
+Age, gender, and school type (boys-only and girls-only) show minimal differences between respondents who used condoms and those who did not.
+Having a regular partner shows a slightly stronger association with condom usage, while receiving gifts/money shows a weak association.
+These findings suggest that further analysis, such as multivariable logistic regression, is needed to assess the independent effects of these variables while controlling for confounders.
+
+
+# Startistical tests
+
+```{r}
+# Cross-tabulation of giftpartner_f and condomlast_f
+table(sur_data4$giftpartner_f, sur_data4$condomlast_f)
+
+# Descriptive summary of continuous variables
+summary(sur_data4$age)
+summary(sur_data4$boysonlyschool)
+summary(sur_data4$girlsonlyschool)
+
+
+```
+
+# Bivariate Analysis
+- Use a Chi-Square test to assess the association between giftpartner_f and condomlast_f.
+- Perform a t-test or Wilcoxon test for continuous variables like age.
+```{r}
+# Chi-Square test for association between giftpartner_f and condomlast_f
+chisq_test <- chisq.test(table(sur_data4$giftpartner_f, sur_data4$condomlast_f))
+chisq_test
+
+```
+# # Run a univariable (unadjusted) logistic regression model for receiving gifts/money predicting condom usage, with log odds and OR.
+```{r}
+model1 <- glm(condomlast_f ~ giftpartner_f, data = sur_data4, family = "binomial")
+
+# View the model summary to get log odds
+summary(model1) 
+
+# Exponentiate coefficients to get Odds Ratios (ORs)
+exp(model1$coefficients)
+
+# Get 95% Confidence Intervals (CIs) for ORs
+exp(confint(model1))
+
+
+    odds.n.ends(model1) 
+
+```
+
+# Interpretation:
+
+For individuals who did not receive gifts/money, the odds of using a condom are 7.8% higher compared to those who did receive gifts/money. However, this association is not statistically significant (p = 0.602), and the confidence interval (0.813–1.429) includes 1, suggesting that there may be no real effect.
+The intercept suggests that the baseline odds of using a condom (when the predictor variable is at its reference level) are 1.15 times higher. Again, this is not significant.
+
+# Logistic regression with giftpartner_f as a binary predictor
+```{r}
+
+model <- glm(condomlast_f ~ giftpartner_f + age + sex_f + regpartner_f + boysonlyschool + girlsonlyschool + realdivision, 
+             data = sur_data4, 
+             family = "binomial")
+
+# Summary of the model
+summary(model)
+
+# Odds Ratios and Confidence Intervals
+exp(model$coefficients) # ORs
+exp(confint(model)) # CIs
+
+```
+
+# Brief interpretation:
+
+
+```{r}
+library(car)
+vif_model <- glm(condomlast_f ~ giftpartner_f + age + sex_f + regpartner_f, 
+                 family = "binomial", data = sur_data4)
+vif(vif_model)
+
+```
+
+
+# Let's refine the model by removing variables with high p-value
+```{r}
+# Simplified logistic regression model
+model_refined <- glm(
+  condomlast_f ~ giftpartner_f + age + sex_f + regpartner_f, 
+  data = sur_data4, 
+  family = "binomial"
+)
+
+summary(model_refined)
+exp(model_refined$coefficients) # ORs
+exp(confint(model_refined)) # CIs
+
+```
+
+Create tabel for presentation of results. 
+```{r}
+# Prepare the table data
+table_data <- data.frame(
+  Variable = c("Intercept", "No Gifts (Ref: Yes)", "Age", "Female (Ref: Male)", "No Partner (Ref: Partner)"),
+  Estimate = c(1.61209, 0.03550, -0.09777, -0.07618, 0.29058),
+  OR = c(5.01, 1.04, 0.91, 0.93, 1.34),
+  `95% CI` = c("0.97–26.36", "0.78–1.38", "0.82–1.00", "0.69–1.25", "1.00–1.79"),
+  `p-value` = c(0.056, 0.808, 0.054, 0.621, 0.049)
+)
+
+# Create the table
+knitr::kable(table_data, 
+             col.names = c("Variable", "Estimate", "OR", "95% CI", "p-value"),
+             caption = "Logistic Regression Results for Condom Use")
+
+```
+
+```{r}
+# Logistic regression with interaction term
+interaction_model <- glm(condomlast_f ~ giftpartner_f * regpartner_f + age + sex_f + boysonlyschool + girlsonlyschool + realdivision, 
+                         family = "binomial", data = sur_data4)
+
+summary(interaction_model)
+
+# Perform LR test to assess interaction
+lrtest(main_model, interaction_model)
+
+
+```
+
+
+
+
+
+
